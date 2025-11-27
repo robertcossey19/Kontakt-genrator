@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>NKI Generator</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#111; color:#f5f5f5; }
+    .app { max-width:480px; margin:40px auto; padding:20px; background:#1b1b1b;
+           border-radius:12px; box-shadow:0 0 24px rgba(0,0,0,0.5); }
+    h1 { font-size:1.3rem; margin-bottom:16px; }
+    form { display:flex; flex-direction:column; gap:12px; }
+    label { display:flex; flex-direction:column; gap:4px; font-size:0.9rem; }
+    input, select { padding:8px; border-radius:6px; border:1px solid #444;
+                    background:#111; color:#f5f5f5; }
+    button { margin-top:8px; padding:10px 16px; border-radius:999px; border:none;
+             background:#3b82f6; color:#fff; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:default; }
+    #status { margin-top:12px; font-size:.85rem; min-height:1.2em; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>NKI Generator</h1>
+    <form id="genForm">
+      <label>
+        Instrument name
+        <input id="instrumentName" required placeholder="MySnareV1">
+      </label>
+
+      <label>
+        Root note
+        <select id="rootNote" required>
+          <option value="C0">C0</option>
+          <option value="C1">C1</option>
+          <option value="C2">C2</option>
+          <option value="C3">C3</option>
+          <option value="C4">C4</option>
+          <option value="D4">D4</option>
+        </select>
+      </label>
+
+      <label>
+        WAV files
+        <input id="wavFiles" type="file" multiple accept=".wav" required>
+      </label>
+
+      <button type="submit">Generate NKI Pack</button>
+    </form>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("genForm");
+    const statusEl = document.getElementById("status");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("instrumentName").value.trim();
+      const root = document.getElementById("rootNote").value;
+      const files = document.getElementById("wavFiles").files;
+
+      if (!name || !root || !files.length) {
+        statusEl.textContent = "Fill everything out and pick at least one WAV.";
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append("instrument_name", name);
+      fd.append("root_note", root);
+      for (const f of files) fd.append("wav_files", f);
+
+      statusEl.textContent = "Generating...";
+      form.querySelector("button").disabled = true;
+
+      try {
+        const res = await fetch("/generate", { method: "POST", body: fd });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${name}_${root}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        statusEl.textContent = "✅ Done! Check your downloads.";
+      } catch (err) {
+        statusEl.textContent = "❌ Error: " + err.message;
+      } finally {
+        form.querySelector("button").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
